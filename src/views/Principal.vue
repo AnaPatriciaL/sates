@@ -303,17 +303,20 @@
                         </v-col>
                         <!-- Oficina -->
                         <v-col class="my-0 py-0" cols="12" md="3">
-                          <v-text-field
-                            :value="nombreOficina"
+                          <v-select
+                            :items="oficinas_listado"
+                            v-model="prospectoie.oficina_id"
                             label="Oficina"
                             outlined
                             dense
-                            disabled
+                            required
+                            item-text="nombre"
+                            item-value="id"
                           >
-                          </v-text-field>
+                          </v-select>
                         </v-col>
                         <!-- Giro -->
-                        <v-col class="my-0 py-0" cols="12" md="12">
+                        <v-col class="my-0 py-0" cols="12" md="6">
                           <v-text-field
                             class="my-0 py-0 mayusculas"
                             v-model="prospectoie.giro"
@@ -326,7 +329,6 @@
                             {{prospectoie.giro}}
                           </v-text-field>
                         </v-col>
-                        <!-- Periodos -->
                         <v-col class="my-0 py-0" cols="12" md="1">
                           <v-tooltip top>
                             <template v-slot:activator="{ on, attrs }">
@@ -337,13 +339,14 @@
                             <span>Agregar Periodo</span>
                           </v-tooltip>
                         </v-col>
-                        <v-col class="my-0 py-0" cols="12" md="5">
+                        <v-col class="my-0 py-0" cols="12" md="5" >
                           <v-text-field
                             class="my-0 py-0 mayusculas"
                             v-model="prospectoie.periodos"
                             label="Periodos"
                             outlined
                             dense
+                            readonly
                           >
                             {{prospectoie.periodos}}
                           </v-text-field>
@@ -468,7 +471,7 @@
                             class="my-0 py-0 mayusculas"
                             v-model="prospectoie.origen"
                             inset
-                            :label="prospectoie.origen ? 'Origen: Cruce' : 'Origen: Prospecto'">
+                            :label="prospectoie.origen ? 'Origen: Prospecto' : 'Origen: Cruce'">
                              {{prospectoie.origen}}
                           ></v-switch>
                         </v-col>
@@ -524,7 +527,7 @@
           </v-dialog>
 					<!-- Cargando -->
           <!-- Componente de Diálogo para PERIODOS -->
-          <v-dialog v-model="dialogPeriodos" max-width="500px" persistent>
+          <v-dialog v-model="dialogPeriodos" max-width="600px" persistent>
             <v-card>
               <v-card-title class="pink darken-4 white--text py-2">
                 Agregar Periodo
@@ -532,21 +535,23 @@
               <v-card-text>
                 <v-container>
                   <v-row v-for="(periodo, index) in periodosParaAgregar" :key="index" class="mt-2 align-center no-gutters">
-                      <v-col cols="12" md="5">
+                      <v-col cols="12" sm="5">
                         <v-text-field
                         class="mr-4"
                           v-model="periodo.inicio"
+                          :ref="'fechaInicio' + index"
                           v-maska="'##/##/####'"
                           :rules="[rules.dateFormat]"
                           label="Fecha Inicial"
                           outlined
                           dense
                           @input="manejarInputFecha(periodo, index, 'inicio')"
+                          @keydown="soloNumeros"
                           maxlength="10"
                           placeholder="DD/MM/YYYY"
                         ></v-text-field>
                       </v-col>
-                      <v-col cols="12" md="5">
+                      <v-col cols="12" sm="5">
                         <v-text-field
                           v-model="periodo.fin"
                           v-maska="'##/##/####'"
@@ -554,13 +559,15 @@
                           label="Fecha Final"
                           :ref="'fechaFin' + index"
                           @input="validarFechaFinal(periodo, index)"
+                          @keydown.enter.prevent="enfocarBotonAgregar"
+                          @keydown="soloNumeros"
                           outlined
                           dense
                           maxlength="10"
                           placeholder="DD/MM/YYYY"
                         ></v-text-field>
                       </v-col>
-                      <v-col cols="12" md="2" class="text-center">
+                      <v-col cols="12" sm="2" class="text-center">
                         <v-btn icon color="red" @click="eliminarFilaPeriodo(index)">
                           <v-icon>mdi-delete</v-icon>
                         </v-btn>
@@ -578,7 +585,7 @@
                   </template>
                   <span>Agregar un periodo extra</span>
                 </v-tooltip>
-                <v-btn color="success" dark @click="agregarPeriodo">Agregar</v-btn>
+                <v-btn ref="botonAgregarPeriodo" color="success" dark @click="agregarPeriodo">Agregar</v-btn>
                 <v-btn color="blue-grey" dark @click="cerrarDialogoPeriodo">Cerrar</v-btn>
                 <v-spacer></v-spacer>
               </v-card-actions>
@@ -761,16 +768,7 @@ export default {
         return `${this.fechaInicio} AL ${this.fechaFin}`;
       }
       return ''; // O maneja el caso donde uno o ambos están vacíos
-    },
-    nombreOficina() {
-      if (this.prospectoie.oficina_id && this.oficinas_listado.length > 0) {
-        const oficina = this.oficinas_listado.find(
-          (o) => o.id == this.prospectoie.oficina_id
-        );
-        return oficina ? oficina.nombre : "";
-      }
-      return "";
-    },
+    }
   },
   watch: {
     // Observador para asignar el valor de la propiedad computada al modelo final
@@ -797,14 +795,37 @@ export default {
         });
       },
       deep: true // Observa cambios profundos en el array de objetos
-    },'prospectoie.municipio_id'(newVal) {
-      if (newVal) {
-        const municipio = this.municipios_listado.find((m) => m.id == newVal);
-        if (municipio && municipio.oficina_id) {
-          this.prospectoie.oficina_id = municipio.oficina_id;
-        }
-      } else {
-        this.prospectoie.oficina_id = null;
+    },
+  },
+  watch: {
+    'periodosParaAgregar': {
+      handler(newVal) {
+        newVal.forEach(periodo => {
+          // Añade la diagonal después del día
+          if (periodo.inicio && periodo.inicio.length === 2 && !periodo.inicio.includes('/')) {
+            periodo.inicio += '/';
+          }
+          // Añade la diagonal después del mes
+          if (periodo.inicio && periodo.inicio.length === 5 && periodo.inicio.split('/').length - 1 < 2) {
+            periodo.inicio += '/';
+          }
+          // Repite para la fecha final
+          if (periodo.fin && periodo.fin.length === 2 && !periodo.fin.includes('/')) {
+            periodo.fin += '/';
+          }
+          if (periodo.fin && periodo.fin.length === 5 && periodo.fin.split('/').length - 1 < 2) {
+            periodo.fin += '/';
+          }
+        });
+      },
+      deep: true
+    },
+    dialogPeriodos(val) { // Observador para enfocar al abrir el diálogo
+      if (val) {
+        this.$nextTick(() => {
+          const ref = this.$refs.fechaInicio0;
+          if (ref && ref[0]) ref[0].focus();
+        });
       }
     },
   },
@@ -971,13 +992,14 @@ export default {
       if (errores>0) {
         await Swal.fire({  
           position: 'center',  
-          icon: 'error',  
+          icon: 'warning',  
           titleText: 'Datos incompletos',
           text: textoMostrar,
           allowOutsideClick: false, // Evita que el usuario cierre el cuadro de diálogo haciendo clic fuera de él
-          showConfirmButton: false,  
-          timerProgressBar: true,
-          timer: 1800})
+          showConfirmButton: true,
+          confirmButtonText: 'Entendido',
+          confirmButtonAriaLabel: 'Entendido, cerrar alerta'
+        })
           this.$refs.rfc.focus();
           return;
       }else{
@@ -1050,7 +1072,9 @@ export default {
           Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: 'Hubo un error al cargar los datos: ' + error.message
+            text: 'Hubo un error al guardar los datos: ' + error.message,
+            confirmButtonText: 'OK',
+            confirmButtonAriaLabel: 'OK'
           });
       })
       .finally(() => {
@@ -1142,7 +1166,9 @@ export default {
           Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: 'Hubo un error al cargar los datos: ' + error.message
+            text: 'Hubo un error al actualizar los datos: ' + error.message,
+            confirmButtonText: 'OK',
+            confirmButtonAriaLabel: 'OK'
           });
         })
         .finally(() => {
@@ -1349,16 +1375,21 @@ export default {
       }
     },
     agregarPeriodo() {
+      // Primero, valida que todos los periodos sean correctos.
+      if (!this.validarTodosLosPeriodos()) {
+        return; // Detiene la ejecución si hay un error de validación.
+      }
+
       const nuevosPeriodos = this.periodosParaAgregar
         .filter(p => p.inicio && p.fin) // Filtra los que están completos
         .map(p => `${p.inicio}-${p.fin}`); // Les da el nuevo formato
 
       if (nuevosPeriodos.length > 0) {
-        // Sobrescribe el campo de periodos con los nuevos valores, unidos por coma.
-        this.prospectoie.periodos = nuevosPeriodos.join(', ');
+        // Si ya hay periodos, los concatena. Si no, los asigna.
+        this.prospectoie.periodos = this.prospectoie.periodos
+          ? `${this.prospectoie.periodos}, ${nuevosPeriodos.join(', ')}`
+          : nuevosPeriodos.join(', ');
       }
-      console.log('esto es nuevos periodos', nuevosPeriodos);
-      console.log('esto es periodos para agregar',this.periodosParaAgregar);
       this.cerrarDialogoPeriodo();
     },
     cerrarDialogoPeriodo() {
@@ -1397,32 +1428,140 @@ export default {
         });
       }
     },
-    validarFechaFinal(periodo, index) {
+    async validarFechaFinal(periodo, index) {
       if (periodo.inicio && periodo.fin && periodo.fin.length === 10) {
-        const [diaInicio, mesInicio, anioInicio] = periodo.inicio.split('/');
+        if (!this.esFechaValida(periodo.inicio) || !this.esFechaValida(periodo.fin)) {
+          return Swal.fire('Error', 'Una de las fechas no es válida', 'error');
+        }
+
+       const [diaInicio, mesInicio, anioInicio] = periodo.inicio.split('/');
         const fechaInicio = new Date(`${anioInicio}-${mesInicio}-${diaInicio}`);
 
         const [diaFin, mesFin, anioFin] = periodo.fin.split('/');
         const fechaFin = new Date(`${anioFin}-${mesFin}-${diaFin}`);
-
+        
         if (fechaFin <= fechaInicio) {
-          Swal.fire({
+          // Espera a que el usuario interactúe con la alerta.
+          const result = await Swal.fire({
             icon: 'error',
             title: 'Fecha incorrecta',
             text: 'La fecha final debe ser mayor a la fecha inicial.',
+            confirmButtonText: 'Corregir',
+            confirmButtonAriaLabel: 'Corregir fecha',
+            // Forzar el foco en el botón de confirmación después de que la alerta se muestre.
+            didRender: () => {
+              const confirmButton = Swal.getConfirmButton();
+              if (confirmButton) confirmButton.focus();
+            }
           });
 
-          this.$nextTick(() => {
+          // Si el usuario confirma, enfoca el campo para su corrección.
+          if (result.isConfirmed) {
             const finRef = this.$refs['fechaFin' + index];
             if (finRef && finRef[0]) {
               finRef[0].$el.querySelector('input').select();
             }
-          });
+          }
         }
+      }
+    },
+    validarTodosLosPeriodos() {
+      for (const [index, periodo] of this.periodosParaAgregar.entries()) {
+        // Solo validar filas que tienen al menos una fecha ingresada
+        const tieneFechaInicial = periodo.inicio && periodo.inicio.length === 10;
+        const tieneFechaFinal = periodo.fin && periodo.fin.length === 10;
+
+        if (periodo.inicio || periodo.fin) { // Si hay algún intento de ingresar fechas en esta fila
+          if (!this.esFechaValida(periodo.inicio) || !this.esFechaValida(periodo.fin)) {
+            Swal.fire('Error', 'Una de las fechas no es válida', 'error');
+            return false;
+          }
+
+          if (!tieneFechaInicial || !tieneFechaFinal) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Fechas incompletas',
+              text: `En la fila ${index + 1}, ambas fechas (inicial y final) deben estar completas (DD/MM/YYYY).`,
+              confirmButtonText: 'Corregir'
+            });
+            return false;
+          }
+
+          // Convertir fechas a objetos Date para comparación
+          const [diaInicio, mesInicio, anioInicio] = periodo.inicio.split('/');
+          const fechaInicio = new Date(`${anioInicio}-${mesInicio}-${diaInicio}`);
+
+          const [diaFin, mesFin, anioFin] = periodo.fin.split('/');
+          const fechaFin = new Date(`${anioFin}-${mesFin}-${diaFin}`);
+
+          // 1. Validar que la fecha final sea mayor que la fecha inicial en la misma fila
+          if (fechaFin <= fechaInicio) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Fecha incorrecta',
+              text: `En la fila ${index + 1}, la fecha final debe ser mayor que la fecha inicial.`,
+              confirmButtonText: 'Corregir'
+            });
+            return false;
+          }
+
+          // 2. Validar que la fecha inicial de la fila actual sea mayor que la fecha final de la fila anterior
+          if (index > 0) {
+            const periodoAnterior = this.periodosParaAgregar[index - 1];
+            // Asegurarse de que el período anterior también esté completo para la comparación
+            if (periodoAnterior.fin && periodoAnterior.fin.length === 10) {
+              const [prevDiaFin, prevMesFin, prevAnioFin] = periodoAnterior.fin.split('/');
+              const prevFechaFin = new Date(`${prevAnioFin}-${prevMesFin}-${prevDiaFin}`);
+
+              if (fechaInicio <= prevFechaFin) {
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Fechas superpuestas',
+                  text: `En la fila ${index + 1}, la fecha inicial debe ser posterior a la fecha final de la fila anterior.`,
+                  confirmButtonText: 'Corregir'
+                });
+                return false;
+              }
+            }
+          }
+        }
+      }
+      return true; // Indica que todos los periodos son válidos.
+    },
+    esFechaValida(fecha) {
+      if (!fecha || fecha.length !== 10) return false;
+
+      const [dia, mes, anio] = fecha.split('/');
+      if (!/^\d+$/.test(dia) || !/^\d+$/.test(mes) || !/^\d+$/.test(anio)) return false;
+
+      const d = new Date(`${anio}-${mes}-${dia}`);
+      if (isNaN(d.getTime())) return false;
+
+      if (d.getDate() != dia || (d.getMonth() + 1) != mes || d.getFullYear() != anio) return false;
+
+      return true;
+
+    },
+    soloNumeros(event) {
+      // Permite teclas de control como backspace, delete, tab, escape, enter, y las flechas.
+      const controlKeys = [8, 9, 13, 27, 37, 38, 39, 40, 46];
+      if (controlKeys.includes(event.keyCode)) {
+        return;
+      }
+
+      // Permite combinaciones como Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+      if ((event.ctrlKey || event.metaKey) && ['a', 'c', 'v', 'x'].includes(event.key.toLowerCase())) {
+        return;
+      }
+
+      // Si la tecla presionada no es un número, previene la acción.
+      if (!/^\d$/.test(event.key)) {
+        event.preventDefault();
       }
     }
   },
 };
+</script>
 </script>
 <style>
 
