@@ -713,7 +713,7 @@ export default {
     },
     mostrarLista: function () {
       axios
-        .post(crud, { opcion: 6 })
+        .post(crud, { opcion: 1, estatus_prospecto: 3 })
         .then((response) => {
           if (Array.isArray(response.data)) {
             this.lista_prospectosie = response.data;
