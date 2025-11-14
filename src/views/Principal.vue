@@ -862,7 +862,7 @@ export default {
     },
     mostrar: function () {
       axios
-        .post(crud, { opcion: 1 })
+        .post(crud, { opcion: 1, estatus_prospecto:0 })
         .then((response) => {
           if (Array.isArray(response.data)) {
             this.prospectosie = response.data;
@@ -1027,7 +1027,7 @@ export default {
       axios.post(crud, 
             {
               // Nuevo
-              opcion:2, 
+              opcion:2,  
               // Campos a guardar
               rfc:this.prospectoie.rfc.toUpperCase(),
               nombre:nombre,
@@ -1593,9 +1593,6 @@ tbody tr:nth-of-type(odd) {
   text-transform: uppercase
 }
 
-/* app {
-  background-color: #d8d8d8;
-} */
 .center-header {
   text-align: center;
 }
