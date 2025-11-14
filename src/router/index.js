@@ -3,6 +3,7 @@ import Vue from "vue";
 import Router from "vue-router";
 import Login from "@/views/Login.vue";
 import Principal from "@/views/Principal.vue";
+import ConsultasIE from "@/views/ConsultasIE.vue";
 import ProspectosIE from "@/views/ProspectosIE.vue";
 import ListasIE from "@/views/ListasIE.vue";
 import ComitesIE from "@/views/ComitesIE.vue";
@@ -22,6 +23,12 @@ const router = new Router({
       path: "/",
       name: "Principal",
       component: Principal,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/consultasIE",
+      name: "ConsultasIE",
+      component: ConsultasIE,
       meta: { requiresAuth: true },
     },
     {
